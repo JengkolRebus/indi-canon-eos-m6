@@ -80,3 +80,7 @@ In KStars/Ekos, select:
 ```text
 Canon EOS M6
 ```
+
+## Credits
+
+Developed with assistance from ChatGPT by OpenAI.

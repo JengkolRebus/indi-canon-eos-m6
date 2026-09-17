@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<driversList>
+  <devGroup>CCD</devGroup>
+  <device label="Canon EOS M6">
+    <driver name="Canon EOS M6">indi_canon_eos_m6</driver>
+    <version>1.0</version>
+  </device>
+</driversList>

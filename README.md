@@ -94,6 +94,19 @@ In KStars/Ekos, select:
 Canon EOS M6
 ```
 
+## Testing Status
+
+### KStars / Ekos
+- Camera connection tested.
+- CR2 capture and download tested.
+- CR2 to FITS conversion tested.
+- FITS delivery through INDI CCD BLOB tested.
+
+### Polaris
+- INDI connection tested.
+- FITS BLOB delivery to Polaris is being tested.
+- Capture and sequence workflow testing is pending.
+
 ## Credits
 
 Developed with assistance from ChatGPT by OpenAI.

@@ -26,6 +26,19 @@ CAPTURE
  -> ExposureComplete
 ```
 
+### Capture Mode
+
+The driver does not modify camera settings.
+
+Capture is performed using the settings currently configured on the
+Canon EOS M6. Exposure parameters such as ISO, shutter speed, aperture,
+and other camera settings must therefore be configured on the camera
+before capture.
+
+The driver only triggers the camera capture, downloads the resulting
+CR2 file, verifies it, deletes the downloaded file from the camera,
+and processes the CR2 into FITS for INDI.
+
 ### DISCONNECT
 
 ```text

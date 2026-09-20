@@ -28,6 +28,9 @@
 #include <gphoto2/gphoto2-file.h>
 #include <gphoto2/gphoto2-widget.h>
 
+#include <libraw/libraw.h>
+#include <fitsio.h>
+
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
@@ -37,6 +40,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
+#include <algorithm>
 
 class EOSM6USB : public INDI::CCD
 {
@@ -68,6 +72,8 @@ private:
                              std::string &value);
 
     bool captureAndDownload(std::string &localFile);
+    bool convertCR2ToFITS(const std::string &cr2File,
+                          const std::string &fitsFile);
     bool loadFileToCCD(const std::string &localFile);
 
     std::string makeLocalFilename() const;
@@ -112,8 +118,8 @@ bool EOSM6USB::initProperties()
 
     addCaptureFormat({"CR2", "CR2", 16, true, true});
 
-    EncodeFormatSP[FORMAT_FITS].setState(ISS_OFF);
-    EncodeFormatSP[FORMAT_NATIVE].setState(ISS_ON);
+    EncodeFormatSP[FORMAT_FITS].setState(ISS_ON);
+    EncodeFormatSP[FORMAT_NATIVE].setState(ISS_OFF);
 
     PrimaryCCD.setMinMaxStep("CCD_EXPOSURE", "CCD_EXPOSURE_VALUE",
                              0.001, 3600.0, 0.001);
@@ -439,13 +445,171 @@ bool EOSM6USB::captureAndDownload(std::string &localFile)
     return true;
 }
 
+bool EOSM6USB::convertCR2ToFITS(const std::string &cr2File,
+                                const std::string &fitsFile)
+{
+    LibRaw raw;
+
+    int rc = raw.open_file(cr2File.c_str());
+    if (rc != LIBRAW_SUCCESS)
+    {
+        LOGF_ERROR("LibRaw open_file() failed: %d", rc);
+        return false;
+    }
+
+    rc = raw.unpack();
+    if (rc != LIBRAW_SUCCESS)
+    {
+        LOGF_ERROR("LibRaw unpack() failed: %d", rc);
+        return false;
+    }
+
+    const int rawWidth  = raw.imgdata.sizes.raw_width;
+    const int rawHeight = raw.imgdata.sizes.raw_height;
+    const unsigned rawPitch = raw.imgdata.sizes.raw_pitch;
+
+    const int width      = raw.imgdata.sizes.width;
+    const int height     = raw.imgdata.sizes.height;
+    const int leftMargin = raw.imgdata.sizes.left_margin;
+    const int topMargin  = raw.imgdata.sizes.top_margin;
+
+    unsigned short *pixels = raw.imgdata.rawdata.raw_image;
+
+    if (!pixels ||
+        rawWidth <= 0 || rawHeight <= 0 ||
+        width <= 0 || height <= 0)
+    {
+        LOG_ERROR("LibRaw returned invalid RAW image data.");
+        return false;
+    }
+
+    if (leftMargin < 0 || topMargin < 0 ||
+        leftMargin + width > rawWidth ||
+        topMargin + height > rawHeight)
+    {
+        LOGF_ERROR(
+            "Invalid LibRaw crop: raw=%dx%d crop=%dx%d offset=%d,%d",
+            rawWidth, rawHeight,
+            width, height,
+            leftMargin, topMargin);
+
+        return false;
+    }
+
+    LOGF_INFO(
+        "RAW crop: full=%dx%d active=%dx%d offset=%d,%d",
+        rawWidth, rawHeight,
+        width, height,
+        leftMargin, topMargin);
+
+    std::vector<unsigned short> croppedPixels(
+        static_cast<size_t>(width) * height);
+
+    for (int y = 0; y < height; ++y)
+    {
+        const unsigned short *src =
+            pixels +
+            static_cast<size_t>(topMargin + y) * (rawPitch / 2) +
+            leftMargin;
+
+        unsigned short *dst =
+            croppedPixels.data() +
+            static_cast<size_t>(y) * width;
+
+        std::copy(src, src + width, dst);
+    }
+
+    fitsfile *fptr = nullptr;
+    int status = 0;
+
+    std::string filename = "!" + fitsFile;
+
+    fits_create_file(&fptr, filename.c_str(), &status);
+
+    if (status)
+    {
+        fits_report_error(stderr, status);
+        return false;
+    }
+
+    long naxes[2] = {width, height};
+
+    fits_create_img(
+        fptr,
+        USHORT_IMG,
+        2,
+        naxes,
+        &status
+    );
+
+    long npixels =
+        static_cast<long>(width) * height;
+
+    fits_write_img(
+        fptr,
+        TUSHORT,
+        1,
+        npixels,
+        croppedPixels.data(),
+        &status
+    );
+
+    if (!status)
+    {
+        const char *camera = "Canon EOS M6";
+        const char *rawtype = "BAYER";
+
+        fits_update_key(
+            fptr,
+            TSTRING,
+            "CAMERA",
+            const_cast<char *>(camera),
+            "Camera model",
+            &status
+        );
+
+        fits_update_key(
+            fptr,
+            TSTRING,
+            "RAWTYP",
+            const_cast<char *>(rawtype),
+            "RAW image type",
+            &status
+        );
+    }
+
+    fits_close_file(fptr, &status);
+
+    if (status)
+    {
+        fits_report_error(stderr, status);
+        return false;
+    }
+
+    LOGF_INFO(
+        "CR2 converted to FITS: %s (%dx%d)",
+        fitsFile.c_str(),
+        width,
+        height);
+
+    return true;
+}
+
 bool EOSM6USB::loadFileToCCD(const std::string &localFile)
 {
-    std::ifstream file(localFile, std::ios::binary | std::ios::ate);
+    const std::string fitsFile = localFile + ".fits";
+
+    if (!convertCR2ToFITS(localFile, fitsFile))
+    {
+        LOG_ERROR("Failed to convert CR2 to FITS.");
+        return false;
+    }
+
+    std::ifstream file(fitsFile, std::ios::binary | std::ios::ate);
 
     if (!file)
     {
-        LOGF_ERROR("Cannot open CR2: %s", localFile.c_str());
+        LOGF_ERROR("Cannot open FITS: %s", fitsFile.c_str());
         return false;
     }
 
@@ -453,7 +617,7 @@ bool EOSM6USB::loadFileToCCD(const std::string &localFile)
 
     if (size <= 0)
     {
-        LOGF_ERROR("Invalid CR2 size: %lld",
+        LOGF_ERROR("Invalid FITS size: %lld",
                    static_cast<long long>(size));
         return false;
     }
@@ -473,19 +637,19 @@ bool EOSM6USB::loadFileToCCD(const std::string &localFile)
     if (!file.read(reinterpret_cast<char *>(buffer), size))
     {
         IDSharedBlobFree(buffer);
-        LOG_ERROR("Failed to read CR2 into memory.");
+        LOG_ERROR("Failed to read FITS into memory.");
         return false;
     }
 
-    PrimaryCCD.setImageExtension("cr2");
-    PrimaryCCD.setFrameBufferSize(size, false);
+    PrimaryCCD.setImageExtension("fits");
     PrimaryCCD.setFrameBuffer(buffer);
-    PrimaryCCD.setResolution(6000, 4000);
-    PrimaryCCD.setFrame(0, 0, 6000, 4000);
+    PrimaryCCD.setFrameBufferSize(size, false);
+    PrimaryCCD.setResolution(6024, 4020);
+    PrimaryCCD.setFrame(0, 0, 6024, 4020);
     PrimaryCCD.setNAxis(2);
     PrimaryCCD.setBPP(16);
 
-    LOGF_INFO("CR2 loaded into INDI CCD framebuffer: %lld bytes",
+    LOGF_INFO("FITS loaded into INDI CCD framebuffer: %lld bytes",
               static_cast<long long>(size));
 
     return true;
@@ -531,7 +695,7 @@ bool EOSM6USB::StartExposure(float duration)
 
     if (!loadFileToCCD(localFile))
     {
-        failExposure("Failed to load CR2 into INDI BLOB.");
+        failExposure("Failed to convert/load FITS into INDI BLOB.");
         return false;
     }
 

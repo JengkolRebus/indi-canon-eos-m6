@@ -79,47 +79,59 @@ The final development source is kept in:
 
 `~/indi-eosm6-build/indi-canon-eos-m6`
 
-## 2026-09-21 — CR2 to FITS Integration
+## 2026-09-22 — Direct RAW to INDI FITS Pipeline
 
-### FITS Pipeline
-- Added LibRaw support for reading Canon CR2 RAW data.
-- Added CFITSIO support for generating FITS files.
-- Capture pipeline now performs:
-  - Capture CR2 through libgphoto2
-  - Download CR2 to local storage
-  - Verify downloaded file
-  - Delete CR2 from camera
-  - Convert CR2 to FITS
-  - Load FITS into the INDI CCD BLOB
-  - Complete the exposure through `ExposureComplete()`
+### RAW Pipeline
+- LibRaw is used to read Canon EOS M6 CR2 RAW data.
+- The RAW visible area is copied directly into the INDI CCD framebuffer.
+- No intermediate FITS file is created by the driver.
+- INDI handles the FITS BLOB encoding/transfer.
+- Temporary local CR2 files are removed after successful RAW loading.
 
-### INDI FITS Transfer
-- FITS transfer format is enabled by default.
-- Native transfer format is disabled by default.
-- FITS images are successfully delivered through the INDI CCD BLOB
-  and displayed by KStars.
+Capture pipeline:
+- Capture CR2 through libgphoto2
+- Download CR2 to local storage
+- Verify downloaded file
+- Delete CR2 from camera
+- Load visible RAW data directly into the INDI CCD framebuffer
+- Remove the temporary local CR2
+- Complete the exposure through `ExposureComplete()`
 
-### RAW Geometry Investigation
-LibRaw reports the following geometry for the Canon EOS M6 CR2:
+### EOS M6 RAW Geometry
+LibRaw reports:
 
 - Full RAW: `6288 x 4056`
 - Visible RAW area: `6024 x 4020`
 - Crop offset: `264, 36`
+- RAW pitch: `12576` bytes
 
-The CR2-to-FITS conversion currently crops the LibRaw RAW buffer to
-the reported visible RAW area.
+The driver copies the visible RAW area using the LibRaw-reported
+`raw_pitch` and crop offsets.
 
-The RAW row stride (`raw_pitch`) and CCD geometry are still under
-investigation because the resulting FITS image currently shows a
-horizontal band at the bottom.
+### FITS Transfer
+- FITS transfer format is enabled by default.
+- Native transfer format is disabled by default.
+- FITS images are successfully delivered through the INDI CCD BLOB.
+- KStars successfully displays the FITS images.
+- Sequence capture tested successfully with 5 consecutive frames.
 
-### Current Status
-- CR2 capture/download/delete pipeline remains functional.
-- CR2 to FITS conversion is integrated.
-- FITS BLOB delivery is functional.
-- RAW crop geometry is identified.
-- Final RAW stride handling and CCD geometry alignment are not yet
-  finalized.
+### Polaris Testing
+- Polaris successfully captures through the installed INDI driver.
+- The temporary CR2 is removed after successful processing.
+- `/tmp/indi-eosm6/` remains empty after successful capture.
+- Polaris required write permission to `/tmp/indi-eosm6/` because the
+  Polaris systemd service runs as user `polaris`.
+
+### Installation
+The driver is installed as:
+
+`/usr/local/bin/indi_canon_eos_m6`
+
+Driver XML:
+
+`/usr/share/indi/indi_canon_eos_m6.xml`
+
+The installed binary is used by INDI through the standard driver XML.
 
 ## Future Development
 

@@ -29,7 +29,6 @@
 #include <gphoto2/gphoto2-widget.h>
 
 #include <libraw/libraw.h>
-#include <fitsio.h>
 
 #include <cerrno>
 #include <cstring>
@@ -72,8 +71,7 @@ private:
                              std::string &value);
 
     bool captureAndDownload(std::string &localFile);
-    bool convertCR2ToFITS(const std::string &cr2File,
-                          const std::string &fitsFile);
+    bool loadCR2ToCCD(const std::string &cr2File);
     bool loadFileToCCD(const std::string &localFile);
 
     std::string makeLocalFilename() const;
@@ -445,8 +443,7 @@ bool EOSM6USB::captureAndDownload(std::string &localFile)
     return true;
 }
 
-bool EOSM6USB::convertCR2ToFITS(const std::string &cr2File,
-                                const std::string &fitsFile)
+bool EOSM6USB::loadCR2ToCCD(const std::string &cr2File)
 {
     LibRaw raw;
 
@@ -496,163 +493,60 @@ bool EOSM6USB::convertCR2ToFITS(const std::string &cr2File,
         return false;
     }
 
-    LOGF_INFO(
-        "RAW crop: full=%dx%d active=%dx%d offset=%d,%d",
-        rawWidth, rawHeight,
-        width, height,
-        leftMargin, topMargin);
+    const size_t rowBytes =
+        static_cast<size_t>(width) * sizeof(uint16_t);
 
-    std::vector<unsigned short> croppedPixels(
-        static_cast<size_t>(width) * height);
+    const size_t memsize =
+        static_cast<size_t>(width) *
+        static_cast<size_t>(height) *
+        sizeof(uint16_t);
+
+    uint8_t *memptr =
+        static_cast<uint8_t *>(IDSharedBlobAlloc(memsize));
+
+    if (!memptr)
+    {
+        LOGF_ERROR("IDSharedBlobAlloc failed: %zu bytes", memsize);
+        return false;
+    }
+
+    uint8_t *dst = memptr;
+
+    const size_t rawStride =
+        static_cast<size_t>(rawPitch);
+
+    const uint8_t *src =
+        reinterpret_cast<const uint8_t *>(pixels) +
+        static_cast<size_t>(topMargin) * rawStride +
+        static_cast<size_t>(leftMargin) * sizeof(uint16_t);
 
     for (int y = 0; y < height; ++y)
     {
-        const unsigned short *src =
-            pixels +
-            static_cast<size_t>(topMargin + y) * (rawPitch / 2) +
-            leftMargin;
+        memcpy(dst, src, rowBytes);
 
-        unsigned short *dst =
-            croppedPixels.data() +
-            static_cast<size_t>(y) * width;
-
-        std::copy(src, src + width, dst);
+        dst += rowBytes;
+        src += rawStride;
     }
 
-    fitsfile *fptr = nullptr;
-    int status = 0;
-
-    std::string filename = "!" + fitsFile;
-
-    fits_create_file(&fptr, filename.c_str(), &status);
-
-    if (status)
-    {
-        fits_report_error(stderr, status);
-        return false;
-    }
-
-    long naxes[2] = {width, height};
-
-    fits_create_img(
-        fptr,
-        USHORT_IMG,
-        2,
-        naxes,
-        &status
-    );
-
-    long npixels =
-        static_cast<long>(width) * height;
-
-    fits_write_img(
-        fptr,
-        TUSHORT,
-        1,
-        npixels,
-        croppedPixels.data(),
-        &status
-    );
-
-    if (!status)
-    {
-        const char *camera = "Canon EOS M6";
-        const char *rawtype = "BAYER";
-
-        fits_update_key(
-            fptr,
-            TSTRING,
-            "CAMERA",
-            const_cast<char *>(camera),
-            "Camera model",
-            &status
-        );
-
-        fits_update_key(
-            fptr,
-            TSTRING,
-            "RAWTYP",
-            const_cast<char *>(rawtype),
-            "RAW image type",
-            &status
-        );
-    }
-
-    fits_close_file(fptr, &status);
-
-    if (status)
-    {
-        fits_report_error(stderr, status);
-        return false;
-    }
+    PrimaryCCD.setImageExtension("fits");
+    PrimaryCCD.setFrameBuffer(memptr);
+    PrimaryCCD.setFrameBufferSize(
+        static_cast<int>(memsize), false);
+    PrimaryCCD.setResolution(width, height);
+    PrimaryCCD.setFrame(0, 0, width, height);
+    PrimaryCCD.setNAxis(2);
+    PrimaryCCD.setBPP(16);
 
     LOGF_INFO(
-        "CR2 converted to FITS: %s (%dx%d)",
-        fitsFile.c_str(),
-        width,
-        height);
+        "CR2 loaded directly into INDI CCD framebuffer: %dx%d, %zu bytes",
+        width, height, memsize);
 
     return true;
 }
 
 bool EOSM6USB::loadFileToCCD(const std::string &localFile)
 {
-    const std::string fitsFile = localFile + ".fits";
-
-    if (!convertCR2ToFITS(localFile, fitsFile))
-    {
-        LOG_ERROR("Failed to convert CR2 to FITS.");
-        return false;
-    }
-
-    std::ifstream file(fitsFile, std::ios::binary | std::ios::ate);
-
-    if (!file)
-    {
-        LOGF_ERROR("Cannot open FITS: %s", fitsFile.c_str());
-        return false;
-    }
-
-    const std::streamsize size = file.tellg();
-
-    if (size <= 0)
-    {
-        LOGF_ERROR("Invalid FITS size: %lld",
-                   static_cast<long long>(size));
-        return false;
-    }
-
-    file.seekg(0, std::ios::beg);
-
-    uint8_t *buffer =
-        static_cast<uint8_t *>(IDSharedBlobAlloc(size));
-
-    if (!buffer)
-    {
-        LOGF_ERROR("IDSharedBlobAlloc failed for %lld bytes",
-                   static_cast<long long>(size));
-        return false;
-    }
-
-    if (!file.read(reinterpret_cast<char *>(buffer), size))
-    {
-        IDSharedBlobFree(buffer);
-        LOG_ERROR("Failed to read FITS into memory.");
-        return false;
-    }
-
-    PrimaryCCD.setImageExtension("fits");
-    PrimaryCCD.setFrameBuffer(buffer);
-    PrimaryCCD.setFrameBufferSize(size, false);
-    PrimaryCCD.setResolution(6024, 4020);
-    PrimaryCCD.setFrame(0, 0, 6024, 4020);
-    PrimaryCCD.setNAxis(2);
-    PrimaryCCD.setBPP(16);
-
-    LOGF_INFO("FITS loaded into INDI CCD framebuffer: %lld bytes",
-              static_cast<long long>(size));
-
-    return true;
+    return loadCR2ToCCD(localFile);
 }
 
 bool EOSM6USB::StartExposure(float duration)
@@ -699,14 +593,15 @@ bool EOSM6USB::StartExposure(float duration)
         return false;
     }
 
+    unlink(localFile.c_str());
+    LOG_INFO("Temporary CR2 removed.");
+
     LOG_INFO("STEP 2: loadFileToCCD finished.");
 
     busy = false;
     ExposureComplete(&PrimaryCCD);
 
     LOG_INFO("STEP 3: ExposureComplete finished.");
-
-    LOGF_INFO("EOS M6 image complete: %s", localFile.c_str());
 
     return true;
 }

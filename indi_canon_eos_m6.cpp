@@ -22,6 +22,7 @@
 
 #include <indicom.h>
 #include <indiccd.h>
+#include <sharedblob.h>
 
 #include <gphoto2/gphoto2-camera.h>
 #include <gphoto2/gphoto2-context.h>

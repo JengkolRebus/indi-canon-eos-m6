@@ -102,13 +102,12 @@ Build dependencies:
 - INDI development libraries
 - libgphoto2 development libraries
 - LibRaw development libraries
-- CFITSIO development libraries
 - pkg-config
 
 On Ubuntu/Debian:
 
 ```bash
-sudo apt install cmake g++ pkg-config libindi-dev libgphoto2-dev libraw-dev libcfitsio-dev
+sudo apt install cmake g++ pkg-config libindi-dev libgphoto2-dev libraw-dev
 ```
 
 A Canon EOS M6 with USB connection is required for camera testing.
@@ -221,7 +220,6 @@ Built using:
 - INDI
 - libgphoto2
 - LibRaw
-- CFITSIO
 
 Canon EOS M6 driver developed for use with INDI-compatible astronomy software.
 

@@ -591,7 +591,7 @@ bool EOSM6USB::StartExposure(float duration)
 
     if (!loadFileToCCD(localFile))
     {
-        failExposure("Failed to convert/load FITS into INDI BLOB.");
+        failExposure("Failed to load RAW data into INDI BLOB.");
         return false;
     }
 

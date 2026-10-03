@@ -25,7 +25,6 @@ find_library(INDI_DRIVER_LIBRARY
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GPHOTO2 REQUIRED IMPORTED_TARGET libgphoto2)
 pkg_check_modules(LIBRAW REQUIRED IMPORTED_TARGET libraw)
-pkg_check_modules(CFITSIO REQUIRED IMPORTED_TARGET cfitsio)
 
 add_executable(indi_canon_eos_m6
     indi_canon_eos_m6.cpp
@@ -43,7 +42,6 @@ target_link_libraries(indi_canon_eos_m6 PRIVATE
     ${INDI_DRIVER_LIBRARY}
     PkgConfig::GPHOTO2
     PkgConfig::LIBRAW
-    PkgConfig::CFITSIO
 )
 
 install(TARGETS indi_canon_eos_m6 RUNTIME DESTINATION bin)

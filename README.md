@@ -170,7 +170,7 @@ as the camera driver.
 
 Select:
 
-Canon EOS M6
+**Canon EOS M6**
 
 as the camera driver in the Ekos equipment profile.
 

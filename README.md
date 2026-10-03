@@ -43,7 +43,39 @@ The downloaded image is processed as RAW data and delivered through the standard
 
 ## Data Pipeline
 
-Canon EOS M6 -> USB/PTP -> libgphoto2 -> CR2 download -> CR2 verification -> delete CR2 from camera -> LibRaw -> RAW processing -> INDI CCD framebuffer -> FITS BLOB -> INDI client / Ekos / Polaris
+```text
+Canon EOS M6
+      |
+      | USB / PTP
+      v
+ libgphoto2
+      |
+      v
+ CR2 download
+      |
+      v
+ CR2 verification
+      |
+      +----> delete CR2 from camera
+      |
+      v
+    LibRaw
+      |
+      v
+ RAW processing
+      |
+      v
+ INDI CCD framebuffer
+      |
+      v
+    FITS BLOB
+      |
+      v
+ INDI client / Ekos / Polaris
+      |
+      v
+ temporary local CR2 removed
+```
 
 No intermediate FITS file is created on disk by the final capture pipeline.
 
@@ -75,7 +107,9 @@ Build dependencies:
 
 On Ubuntu/Debian:
 
+```bash
 sudo apt install cmake g++ pkg-config libindi-dev libgphoto2-dev libraw-dev libcfitsio-dev
+```
 
 A Canon EOS M6 with USB connection is required for camera testing.
 
@@ -83,32 +117,44 @@ A Canon EOS M6 with USB connection is required for camera testing.
 
 Clone the repository:
 
+```bash
 git clone https://github.com/JengkolRebus/indi-canon-eos-m6.git
 cd indi-canon-eos-m6
+```
 
 Build:
 
+```bash
 cmake -S . -B build
 cmake --build build -j$(nproc)
+```
 
 The resulting driver binary is:
 
+```text
 build/indi_canon_eos_m6
+```
 
 ## Install
 
 Install the driver binary:
 
+```bash
 sudo install -m 755 build/indi_canon_eos_m6 /usr/local/bin/indi_canon_eos_m6
+```
 
 Install the INDI driver definition:
 
+```bash
 sudo install -m 644 indi_canon_eos_m6.xml /usr/share/indi/indi_canon_eos_m6.xml
+```
 
 Installed files:
 
+```text
 /usr/local/bin/indi_canon_eos_m6
 /usr/share/indi/indi_canon_eos_m6.xml
+```
 
 ## Running
 
@@ -132,7 +178,9 @@ as the camera driver in the Ekos equipment profile.
 
 The driver can also be started directly with:
 
+```bash
 indiserver -vv /usr/local/bin/indi_canon_eos_m6
+```
 
 ## Limitations
 

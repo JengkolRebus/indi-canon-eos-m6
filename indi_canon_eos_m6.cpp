@@ -12,7 +12,8 @@
  *   DISCONNECT -> gp_camera_exit()
  *
  * No gphoto2 shell commands are used.
- * No list-files / polling / delete-file operations are used.
+ * No gphoto2 shell commands, file listing, or polling are used.
+ * Downloaded CR2 files are deleted from the camera after successful transfer.
  * Camera settings remain manual.
  *
  * The USB/PTP Camera* session follows the libgphoto2 photobooth

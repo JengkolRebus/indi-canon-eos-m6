@@ -122,7 +122,7 @@ bool EOSM6USB::initProperties()
     EncodeFormatSP[FORMAT_NATIVE].setState(ISS_OFF);
 
     PrimaryCCD.setMinMaxStep("CCD_EXPOSURE", "CCD_EXPOSURE_VALUE",
-                             0.001, 3600.0, 0.001);
+                             0.00025, 30.0, 0.001);
 
     SetCCDParams(6000, 4000, 16, 3.72, 3.72);
     SetCCDCapability(CCD_CAN_ABORT);

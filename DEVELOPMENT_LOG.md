@@ -1,5 +1,15 @@
 # Development Log — INDI Canon EOS M6
 
+### 2026-10-06 — Adjust CCD exposure range for Canon EOS M6
+
+- Changed `CCD_EXPOSURE_VALUE` range from `0.001–3600 s` to `0.00025–30 s`.
+- Kept INDI step at `0.001 s`.
+- This allows Polaris/INDI to accept `1/4000 s` (`0.00025 s`) for bias-frame workflows.
+- The driver does not change the camera shutter speed; the EOS M6 shutter remains configured physically on the camera.
+- Rebuilt and installed the driver on the Polaris PC.
+- Verified that `CCD_EXPOSURE_VALUE=0.00025` is accepted successfully by the installed driver.
+
+
 ## 2026-09-18 — Version 1.0 Final
 
 ### Project

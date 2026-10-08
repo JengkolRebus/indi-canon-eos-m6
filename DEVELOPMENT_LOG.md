@@ -143,6 +143,26 @@ Driver XML:
 
 The installed binary is used by INDI through the standard driver XML.
 
+## 2026-10-09 — CCD Geometry and Polaris Preview Verification
+
+### CCD Configuration
+- Set the reported sensor resolution to 6024 x 4020 pixels.
+- Set pixel size to 3.72 x 3.72 micrometers and bit depth to 16.
+- Expose CCD binning while supporting only 1x1 binning.
+- Added `UpdateCCDBin()` handling to reject unsupported binning requests.
+
+### Polaris Testing
+- Verified that captures are processed and loaded into the INDI CCD framebuffer.
+- Polaris preview successfully displayed the captured image.
+- Logs confirmed that the image relay and BLOB upload completed.
+- Preview remained functional after restarting Polaris.
+- Network instability and slow preview rendering over Wi-Fi were observed;
+  the cause of the rendering delay has not been confirmed.
+
+### Repository Status
+- CCD geometry and binning source changes are local and not yet committed.
+- GitHub has not yet been updated with these changes.
+
 ## Future Development
 
 Add future development notes below this line.

@@ -62,6 +62,7 @@ public:
 
     bool StartExposure(float duration) override;
     bool AbortExposure() override;
+    bool UpdateCCDBin(int binx, int biny) override;
 
 private:
     bool openCamera();
@@ -124,8 +125,12 @@ bool EOSM6USB::initProperties()
     PrimaryCCD.setMinMaxStep("CCD_EXPOSURE", "CCD_EXPOSURE_VALUE",
                              0.00025, 30.0, 0.001);
 
-    SetCCDParams(6000, 4000, 16, 3.72, 3.72);
-    SetCCDCapability(CCD_CAN_ABORT);
+    SetCCDParams(6024, 4020, 16, 3.72, 3.72);
+
+    PrimaryCCD.setMinMaxStep("CCD_BINNING", "HOR_BIN", 1, 1, 1, false);
+    PrimaryCCD.setMinMaxStep("CCD_BINNING", "VER_BIN", 1, 1, 1, false);
+
+    SetCCDCapability(CCD_CAN_ABORT | CCD_CAN_BIN);
 
     IUFillText(&DownloadDirTP[0], "PATH", "Download Directory",
                downloadDir.c_str());
@@ -335,6 +340,7 @@ bool EOSM6USB::Connect()
     // Minimal one-time camera query on connect.
     readCameraSettings();
 
+    PrimaryCCD.setBin(1, 1);
     LOG_INFO("EOS M6 connected. PTP session remains open until disconnect.");
     return true;
 }
@@ -605,6 +611,19 @@ bool EOSM6USB::StartExposure(float duration)
 
     LOG_INFO("STEP 3: ExposureComplete finished.");
 
+    return true;
+}
+
+bool EOSM6USB::UpdateCCDBin(int binx, int biny)
+{
+    if (binx != 1 || biny != 1)
+    {
+        LOGF_ERROR("Unsupported binning requested: %dx%d. EOS M6 supports only 1x1.",
+                   binx, biny);
+        return false;
+    }
+
+    PrimaryCCD.setBin(1, 1);
     return true;
 }
 
